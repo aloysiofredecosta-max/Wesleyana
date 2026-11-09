@@ -77,9 +77,8 @@ summary{font-weight:700;cursor:pointer}
 </div></header>
 <main class="wrap">
   <p class="intro">Tire suas dúvidas sobre a nossa igreja: cultos, endereço, grupos e como participar.</p>
-  <div class="chips" id="chips" role="group" aria-label="Assuntos"></div>
   <div class="chat" id="chat" aria-live="polite"></div>
-  <details id="infoBox"><summary>Informações da igreja</summary><div class="info" id="info"></div>
+  <details id="infoBox" hidden><summary>Informações da igreja</summary><div class="info" id="info"></div>
     <button class="edit-btn" id="editBtn" type="button" hidden>Editar informações</button>
     <div id="editArea" hidden></div>
   </details>
@@ -106,7 +105,7 @@ var sample=null,artifactNs=null,userNs=null,turns=[],busy=false,aiOff=false,edit
 /* ---------- texto e busca local ---------- */
 function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ')}
 var STOP={a:1,o:1,as:1,os:1,de:1,da:1,do:1,das:1,dos:1,e:1,em:1,no:1,na:1,nos:1,nas:1,um:1,uma:1,que:1,qual:1,quais:1,onde:1,como:1,quando:1,para:1,por:1,com:1,tem:1,sao:1,voces:1,igreja:1,posso:1,quero:1,saber:1,sobre:1,me:1,meu:1,minha:1};
-var SIN=[[/horari|cult|ebd|domingo|quinta|hora|missa|reuni/,' cultos horarios'],[/endere|fica|local|chegar|rua|mapa/,' endereco'],[/contat|telefon|whats|falar|ligar|email/,' contato'],[/crianc|infantil|inclus|jovem|louvor|ministerio|atividade/,' ministerios atividades'],[/gceu|grupo|celula|lider/,' gceu grupos']];
+var SIN=[[/horari|cult|ebd|domingo|quinta|hora|missa|reuni/,' cultos horarios'],[/endere|fica|local|chegar|rua|mapa/,' endereco'],[/contat|telefon|whats|falar|ligar|email/,' contato'],[/crianc|infantil|inclus|jovem|louvor|ministerio|atividade/,' ministerios atividades'],[/gceu|grupo|celula|lider/,' gceu grupos'],[/pastor|missionari|dirigent/,' pastor missionaria'],[/escola biblica|ebd|estudo/,' escola biblica ebd']];
 function local(txt){
   var n=norm(txt),extra='';SIN.forEach(function(s){if(s[0].test(n))extra+=s[1]});
   var qs=(n+extra).split(/\s+/).filter(function(w){return w.length>2&&!STOP[w]});
@@ -114,7 +113,7 @@ function local(txt){
   INFO.forEach(function(i){
     if(!(i.v||'').trim())return;
     var th=norm(i.t),hay=norm(i.t+' '+i.v),sc=0;
-    qs.forEach(function(w){if(hay.indexOf(w)>-1)sc+=(th.indexOf(w)>-1?2:1)});
+    qs.forEach(function(w){var ws=w.length>5?[w,w.slice(0,-2)]:[w];ws.some(function(x){if(hay.indexOf(x)>-1){sc+=(th.indexOf(x)>-1?2:1);return true}return false})});
     if(sc>bs){bs=sc;best=i}
   });
   if(best)return best.t+'\n'+best.v.trim();
@@ -139,13 +138,6 @@ function renderInfo(){
     h.textContent=i.t;p.textContent=has?i.v.trim():'Em breve.';if(!has)p.className='soon';
     w.appendChild(h);w.appendChild(p);box.appendChild(w);
   });
-  var ch=$('#chips');ch.innerHTML='';
-  INFO.forEach(function(i){
-    if(!(i.v||'').trim())return;
-    var b=document.createElement('button');b.type='button';b.className='chip';b.textContent=i.t;
-    b.onclick=function(){bubble('me',i.t);bubble('ai',i.v.trim(),'WESLEYANA')};
-    ch.appendChild(b);
-  });
 }
 function erro(code){
   if(code==='rate_limited')return 'Muitas perguntas em pouco tempo. Aguarde um instante e envie de novo.';
@@ -166,7 +158,7 @@ async function ask(text){
   }catch(e){
     turns.pop();
     if(e&&SEM_IA[e.code]){aiOff=true;out.textContent=local(text)}
-    else{out.parentNode.remove();bubble('err',erro(e&&e.code))}
+    else{out.textContent=local(text)}
   }
   busy=false;send.disabled=false;q.focus();
 }
@@ -218,7 +210,8 @@ function closeEditor(){editing=false;$('#editArea').hidden=true;$('#editArea').i
 
 /* ---------- início ---------- */
 renderInfo();
-bubble('ai','A paz do Senhor! Eu sou a Wesleyana, assistente da '+IGREJA+'. Toque em um assunto ou escreva sua pergunta.','WESLEYANA');
+try{fetch('info.json?v='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){if(j&&Array.isArray(j.info)&&j.info.length){INFO=j.info;renderInfo()}}).catch(function(){})}catch(e){}
+bubble('ai','A paz do Senhor! Eu sou a Wesleyana, assistente da '+IGREJA+'. Escreva a sua pergunta e eu respondo.','WESLEYANA');
 $('#form').addEventListener('submit',function(e){e.preventDefault();ask(q.value)});
 q.addEventListener('input',resize);
 q.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask(q.value)}});
@@ -230,6 +223,6 @@ $('#editBtn').addEventListener('click',openEditor);
     artifactNs=await window.claude.use('artifact');
   }}catch(e){}
   var ed=false;try{ed=!!(userNs&&userNs.canEdit&&userNs.canEdit())}catch(e){}
-  if(ed&&artifactNs){$('#editBtn').hidden=false}
+  if(ed&&artifactNs){$('#editBtn').hidden=false;$('#infoBox').hidden=false}
 })();
 })();</script>
